@@ -1,0 +1,183 @@
+<!DOCTYPE html><html lang="hu"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Dupla sakk</title>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<style>
+:root{--bg:#151a14;--fg:#eee9da;--l:#eeeed2;--d:#5a8a4a;--card:#1f2b1d;--card2:#22301f;--acc:#e6b93d;--muted:#9aa79a;--danger:#e05c5c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root[data-theme="light"]{--bg:#f4f1ea;--fg:#222;--card:#fff;--card2:#f2f0e6;--muted:#666}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+html,body{overflow-x:hidden;width:100%;max-width:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,sans-serif;padding:10px}
+h1{font-size:18px;margin:2px 0 10px;text-align:center;letter-spacing:.5px;color:var(--acc)}
+.panel{background:var(--card);border-radius:14px;padding:10px 12px;margin:0 auto 10px;max-width:900px;width:100%}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center}
+.tabs{display:flex;gap:6px;justify-content:center;margin-bottom:8px}
+.tab{padding:6px 14px;border-radius:20px;border:1px solid #ffffff22;background:var(--card2);color:var(--fg);cursor:pointer;font-size:13px;font-weight:600}
+.tab.on{background:var(--acc);color:#1a1a1a;border-color:var(--acc)}
+select,input[type=text]{font-size:14px;padding:6px 8px;border-radius:8px;border:1px solid #ffffff33;background:var(--card2);color:var(--fg)}
+button.act{font-size:13px;padding:7px 14px;border-radius:8px;border:none;background:var(--acc);color:#1a1a1a;font-weight:700;cursor:pointer}
+button.act.sec{background:var(--card2);color:var(--fg);border:1px solid #ffffff33}
+#status{text-align:center;font-size:13px;color:var(--muted);min-height:18px}
+#info{text-align:center;margin:8px 0;font-weight:700;font-size:15px}
+#pick{text-align:center;min-height:0}
+#pick button{font-size:26px;padding:4px 10px;margin:2px;border-radius:8px;border:1px solid #ffffff33;background:var(--card2);color:var(--fg);cursor:pointer}
+#bs{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;width:100%;max-width:100%;padding:0 2px}
+.bd{width:100%;max-width:430px;flex:0 1 430px;background:var(--card);padding:10px;border-radius:14px;box-shadow:0 4px 18px #0006}
+.bd.off{opacity:.5}
+.h{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;color:var(--muted)}
+.h b{color:var(--fg)}
+.g{display:grid;grid-template-columns:repeat(8,1fr);outline:3px solid #00000055;outline-offset:-3px}
+.q{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:min(9vw,38px);cursor:pointer;position:relative;user-select:none}
+.l{background:var(--l)}.q.d{background:var(--d)}
+.s{outline:3px solid var(--acc);outline-offset:-3px}
+.t::after{content:"";position:absolute;width:28%;height:28%;border-radius:50%;background:rgba(0,0,0,.35)}
+.ck{background:radial-gradient(circle,#e0505580 30%,transparent 75%)!important}
+.w{color:#fff;text-shadow:0 0 2px #000,0 0 2px #000,0 0 1px #000}.b{color:#111}
+.r{min-height:40px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12px;margin:4px 0;color:var(--muted)}
+.r button{font-size:22px;padding:1px 7px;border-radius:6px;border:1px solid #ffffff33;background:var(--card2);color:var(--fg);cursor:pointer}
+.r button.s{outline:2px solid var(--acc)}
+.r button:disabled{opacity:.35;cursor:default}
+#clk{text-align:center;font-weight:700;font-size:14px;margin-bottom:2px}
+#clk span.warn{color:var(--danger)}
+</style></head><body>
+<h1>♟ Dupla sakk</h1>
+<div class="panel">
+<div class="tabs"><div class="tab on" id="tabL">Helyi (egy képernyőn)</div><div class="tab" id="tabO">Online</div></div>
+<div id="localCtl" class="row">Idő játékosonként: <select id="tm"><option value="0">nincs</option><option value="3">3 perc</option><option value="5">5 perc</option><option value="10" selected>10 perc</option><option value="15">15 perc</option><option value="30">30 perc</option></select><button class="act" id="ngL">Új parti</button></div>
+<div id="onlineCtl" style="display:none">
+<div class="row" id="onlinePre">Idő: <select id="tmo"><option value="0">nincs</option><option value="3">3 perc</option><option value="5">5 perc</option><option value="10" selected>10 perc</option><option value="15">15 perc</option></select><button class="act" id="mkRoom">Szoba létrehozása</button><input id="code" type="text" placeholder="Szoba kód" style="width:110px;text-transform:uppercase"><button class="act sec" id="jnRoom">Csatlakozás</button></div>
+<div class="row" id="onlinePost" style="display:none">Kód: <b id="roomCodeShow"></b> <button class="act sec" id="copyLink">Link másolása</button> <button class="act sec" id="ngO">Új parti</button></div>
+</div>
+<div id="status"></div>
+</div>
+<div id="clk"></div><div id="info"></div><div id="pick"></div><div id="bs"></div>
+<script>
+const U={K:'\u265A',Q:'\u265B',R:'\u265C',B:'\u265D',N:'\u265E',P:'\u265F\uFE0E'};
+const D=[[1,0],[-1,0],[0,1],[0,-1]],X=[[1,1],[1,-1],[-1,1],[-1,-1]],N=[[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]];
+const on=(r,f)=>r>=0&&r<8&&f>=0&&f<8;
+const own=(bi,c)=>(bi==0)==(c=='w')?'A':'B';
+function att(s,i,c){const r=i>>3,f=i&7,d=c=='w'?1:-1;
+for(const e of[-1,1])if(on(r+d,f+e)&&s[(r+d)*8+f+e]==c+'P')return 1;
+for(const[a,e]of N)if(on(r+a,f+e)&&s[(r+a)*8+f+e]==c+'N')return 1;
+for(const[a,e]of D.concat(X)){let y=r+a,x=f+e,k=1;while(on(y,x)){const p=s[y*8+x];if(p){if(p[0]==c){const t=p[1];if(t=='Q'||(t=='K'&&k)||(t=='R'&&(!a||!e))||(t=='B'&&a&&e))return 1}break}y+=a;x+=e;k=0}}return 0}
+function ps(b,i){const s=b.sq,p=s[i],c=p[0],t=p[1],r=i>>3,f=i&7,o=c=='w'?'b':'w',L=[];
+if(t=='P'){const d=c=='w'?-1:1,pr=(r+d==0||r+d==7);
+if(!s[(r+d)*8+f]){L.push({f:i,t:(r+d)*8+f,pr});if(r==(c=='w'?6:1)&&!s[(r+2*d)*8+f])L.push({f:i,t:(r+2*d)*8+f,dp:1})}
+for(const e of[-1,1])if(on(r+d,f+e)){const j=(r+d)*8+f+e,q=s[j];if(q&&q[0]==o)L.push({f:i,t:j,pr});else if(j==b.ep)L.push({f:i,t:j,ep:1})}}
+else if(t=='N'){for(const[a,e]of N)if(on(r+a,f+e)){const q=s[(r+a)*8+f+e];if(!q||q[0]==o)L.push({f:i,t:(r+a)*8+f+e})}}
+else{for(const[a,e]of(t=='R'?D:t=='B'?X:D.concat(X))){let y=r+a,x=f+e;while(on(y,x)){const q=s[y*8+x];if(q){if(q[0]==o)L.push({f:i,t:y*8+x});break}L.push({f:i,t:y*8+x});if(t=='K')break;y+=a;x+=e}}
+if(t=='K'){const h=c=='w'?7:0;if(i==h*8+4&&!att(s,i,o)){
+if(b.ca[c+'K']&&!s[h*8+5]&&!s[h*8+6]&&!att(s,h*8+5,o))L.push({f:i,t:h*8+6,cs:1});
+if(b.ca[c+'Q']&&!s[h*8+3]&&!s[h*8+2]&&!s[h*8+1]&&!att(s,h*8+3,o))L.push({f:i,t:h*8+2,cs:2})}}}
+return L}
+function ap(b,m){const s=b.sq.slice(),c=b.turn,ca={...b.ca};let ep=-1,cap='';
+if(m.d)s[m.t]=c+m.d;else{const p=s[m.f];cap=s[m.t];
+if(m.ep){const j=m.t+(c=='w'?8:-8);cap=s[j];s[j]=''}
+s[m.t]=m.pr?c+(m.q||'Q'):p;s[m.f]='';
+if(m.cs==1){s[m.t-1]=s[m.t+1];s[m.t+1]=''}if(m.cs==2){s[m.t+1]=s[m.t-2];s[m.t-2]=''}
+if(m.dp)ep=(m.f+m.t)/2;
+if(p[1]=='K'){ca[c+'K']=ca[c+'Q']=0}
+for(const j of[m.f,m.t]){if(j==63)ca.wK=0;if(j==56)ca.wQ=0;if(j==7)ca.bK=0;if(j==0)ca.bQ=0}}
+return{sq:s,turn:c=='w'?'b':'w',ca,ep,cap}}
+const safe=(b,m)=>{const n=ap(b,m);return!att(n.sq,n.sq.indexOf(b.turn+'K'),n.turn)};
+const legal=(b,i)=>ps(b,i).filter(m=>safe(b,m));
+function drops(bi,ty){const b=G.b[bi],L=[];for(let t=0;t<64;t++){if(b.sq[t]||(ty=='P'&&(t<8||t>55)))continue;const m={d:ty,t};if(safe(b,m))L.push(m)}return L}
+function acts(bi){const b=G.b[bi];let n=0;for(let i=0;i<64;i++)if(b.sq[i]&&b.sq[i][0]==b.turn)n+=legal(b,i).length;
+if(!n)for(const ty of new Set(G.R[own(bi,b.turn)][bi]))n+=drops(bi,ty).length;return n}
+function fresh(){const t='RNBQKBNR'.split(''),sq=[];for(let i=0;i<8;i++)sq[i]='b'+t[i];for(let i=8;i<16;i++)sq[i]='bP';for(let i=16;i<48;i++)sq[i]='';for(let i=48;i<56;i++)sq[i]='wP';for(let i=0;i<8;i++)sq[56+i]='w'+t[i];
+return{sq,turn:'w',ca:{wK:1,wQ:1,bK:1,bQ:1},ep:-1}}
+function baseState(mn){return{b:[fresh(),fresh()],R:{A:[[],[]],B:[[],[]]},Q:{A:[[],[]],B:[[],[]]},P:'A',need:[0],done:[],over:null,clockMin:mn,remain:mn?{A:mn*60000,B:mn*60000}:null,turnStart:Date.now(),mode:'local',hostId:null,guestId:null}}
+let G=baseState(10),sel=null,roomCode=null,myRole=null,peer=null,conn=null,pendingHost=false;
+/* --- audio --- */
+let actx;function beep(f,d,ty='sine',g=.18){try{actx=actx||new(window.AudioContext||webkitAudioContext)();const o=actx.createOscillator(),gn=actx.createGain();o.type=ty;o.frequency.value=f;gn.gain.value=g;gn.gain.exponentialRampToValueAtTime(.0001,actx.currentTime+d);o.connect(gn);gn.connect(actx.destination);o.start();o.stop(actx.currentTime+d)}catch(e){}}
+const sndMove=()=>beep(320,.09),sndCap=()=>{beep(180,.13,'triangle',.3);setTimeout(()=>beep(420,.1),40)},sndDrop=()=>beep(560,.11),sndChk=()=>{beep(700,.15,'sawtooth');setTimeout(()=>beep(900,.2),90)};
+/* --- role/turn gating --- */
+const ok=bi=>!G.over&&G.need.includes(bi)&&!G.done.includes(bi)&&(roomCode?G.P===myRole:true);
+function chk(){const rem=G.need.filter(x=>!G.done.includes(x));
+if(rem.length&&rem.every(bi=>!acts(bi))){const inc=rem.find(bi=>{const b=G.b[bi];return att(b.sq,b.sq.indexOf(b.turn+'K'),b.turn=='w'?'b':'w')});
+G.over=inc!=null?(G.P=='A'?'B':'A')+' játékos nyert (matt a '+(inc+1)+'. táblán)!':'Döntetlen (patt).'}}
+function endTurnIfDone(){if(G.need.every(x=>G.done.includes(x))){
+for(const k of[0,1]){G.R[G.P][k].push(...G.Q[G.P][k]);G.Q[G.P][k]=[]}
+if(G.remain){G.remain[G.P]=Math.max(0,G.remain[G.P]-(Date.now()-G.turnStart));G.turnStart=Date.now()}
+G.P=G.P=='A'?'B':'A';G.done=[];G.need=[0,1].filter(x=>own(x,G.b[x].turn)==G.P);chk()}}
+function go(bi,m){const b=G.b[bi],n=ap(b,m);
+if(n.cap&&n.cap[1]!='K'){G.Q[G.P][1-bi].push(n.cap[1]);sndCap()}else if(m.d)sndDrop();else sndMove();
+if(m.d)G.R[G.P][bi].splice(G.R[G.P][bi].indexOf(m.d),1);
+G.b[bi]=n;G.done.push(bi);sel=null;document.getElementById('pick').innerHTML='';
+endTurnIfDone();draw();push()}
+function clk(bi,i){if(G.over)return;const b=G.b[bi];
+if(sel&&sel.bi==bi){const m=sel.L.find(m=>m.t==i);if(m){if(m.pr){const p=document.getElementById('pick');p.innerHTML='Átváltozás: '+'QRBN'.split('').map(q=>`<button data-q="${q}">${U[q]}</button>`).join('');p.querySelectorAll('button').forEach(k=>k.onclick=()=>go(bi,{...m,q:k.dataset.q}));return}go(bi,m);return}}
+sel=null;if(!ok(bi))return draw();const p=b.sq[i];
+if(p&&p[0]==b.turn)sel={bi,i,L:legal(b,i)};draw()}
+function dr(bi,ty){if(!ok(bi))return;sel={bi,d:ty,L:drops(bi,ty)};draw()}
+function draw(){const P=G.P,nm={A:'A játékos',B:'B játékos'};
+document.getElementById('info').innerHTML=G.over?`${G.over} `:`${nm[P]} jön – még lépned kell: ${G.need.filter(x=>!G.done.includes(x)).map(x=>(x+1)+'. tábla').join(' és ')}`;
+document.getElementById('bs').innerHTML=[0,1].map(bi=>{const b=G.b[bi],k=b.sq.indexOf(b.turn+'K'),isChk=att(b.sq,k,b.turn=='w'?'b':'w');
+const resRow=pl=>{const on_=pl==P&&ok(bi);return`<div class="r">${nm[pl]} bábui ide: `+(G.R[pl][bi].length||G.Q[pl][bi].length?G.R[pl][bi].map(ty=>`<button data-d="${ty}" ${on_?'':'disabled'} class="${sel&&sel.bi==bi&&sel.d==ty&&on_?'s':''}"><span class="${own(bi,'w')==pl?'w':'b'}">${U[ty]}</span></button>`).join('')+(G.Q[pl][bi].length?` <i style="opacity:.6">(köv. körtől: ${G.Q[pl][bi].map(t=>U[t]).join(' ')})</i>`:''):'–')+'</div>'};
+let sq='';for(let idx=0;idx<64;idx++){const i=bi==1?63-idx:idx;const p=b.sq[i],isT=sel&&sel.bi==bi&&sel.L.some(m=>m.t==i),isS=sel&&sel.bi==bi&&sel.i===i,isKchk=isChk&&i==k;
+sq+=`<div class="q ${((i>>3)+(i&7))%2?'d':'l'} ${isS?'s':''} ${isT?'t':''} ${isKchk?'ck':''}" data-i="${i}">${p?`<span class="${p[0]}">${U[p[1]]}</span>`:''}</div>`}
+return`<div class="bd ${ok(bi)?'':'off'}" data-b="${bi}"><div class="h"><b>${bi+1}. tábla</b><span>A: ${bi==0?'fehér':'fekete'} · B: ${bi==0?'fekete':'fehér'}${isChk?' · ⚠ SAKK':''}</span></div>${resRow('B')}<div class="g">${sq}</div>${resRow('A')}</div>`}).join('');
+document.querySelectorAll('.q').forEach(e=>e.onclick=()=>clk(+e.closest('.bd').dataset.b,+e.dataset.i));
+document.querySelectorAll('.r button:not(:disabled)').forEach(e=>e.onclick=()=>dr(+e.closest('.bd').dataset.b,e.dataset.d));
+document.getElementById('status').textContent=roomCode?`Online szoba: ${roomCode} · Te vagy: ${myRole=='A'?'A játékos':myRole=='B'?'B játékos':'néző'}`:'Helyi mód – ugyanazon a képernyőn váltogatva';
+clockUI()}
+function remMs(pl){if(!G.remain)return null;return pl===G.P?Math.max(0,G.remain[pl]-(Date.now()-G.turnStart)):G.remain[pl]}
+function fmt(ms){ms=Math.max(0,Math.ceil(ms/1000));return Math.floor(ms/60)+':'+String(ms%60).padStart(2,'0')}
+function clockUI(){const c=document.getElementById('clk');if(!G.remain){c.textContent='';return}
+const a=remMs('A'),b=remMs('B');c.innerHTML=`⏱ A: <span class="${a<=20000?'warn':''}">${fmt(a)}</span> · B: <span class="${b<=20000?'warn':''}">${fmt(b)}</span>`}
+setInterval(()=>{if(!G||G.over||!G.remain)return;const t=remMs(G.P);if(t<=0){G.remain[G.P]=0;G.over=(G.P=='A'?'B':'A')+' játékos nyert (lejárt az idő)!';draw();push();return}clockUI();
+if(!roomCode)draw()},250);
+/* --- start / new game (PeerJS WebRTC, no account needed) --- */
+function push(){if(conn&&conn.open)conn.send({type:'STATE',payload:G})}
+function startLocal(){G=baseState(+document.getElementById('tm').value);roomCode=null;myRole=null;sel=null;if(conn){conn.close();conn=null}if(peer){peer.destroy();peer=null}draw()}
+function randCode(){return Math.random().toString(36).slice(2,7).toUpperCase()}
+function ensurePeer(cb){
+if(peer&&!peer.destroyed){cb();return}
+document.getElementById('status').textContent='Kapcsolódás a hálózathoz...';
+peer=new Peer(randCode(),{debug:1});
+peer.on('open',()=>cb());
+peer.on('connection',c=>{conn=c;wireConn();});
+peer.on('error',e=>{document.getElementById('status').textContent='Hálózati hiba: '+e.type;});
+}
+function createRoom(){
+ensurePeer(()=>{
+roomCode=peer.id;myRole='A';
+G=baseState(+document.getElementById('tmo').value);G.mode='online';
+document.getElementById('roomCodeShow').textContent=roomCode;
+document.getElementById('onlinePre').style.display='none';document.getElementById('onlinePost').style.display='flex';
+history.replaceState(null,'','?room='+roomCode);
+document.getElementById('status').textContent='Szoba létrehozva. Küldd el a kódot vagy a linket az ismerősödnek, és várj, amíg csatlakozik.';
+draw();
+});
+}
+function joinRoom(){
+const target=document.getElementById('code').value.trim().toUpperCase();if(!target)return;
+ensurePeer(()=>{
+myRole='B';roomCode=target;
+conn=peer.connect(target,{reliable:true});
+wireConn();
+document.getElementById('roomCodeShow').textContent=target;
+document.getElementById('onlinePre').style.display='none';document.getElementById('onlinePost').style.display='flex';
+draw();
+});
+}
+function wireConn(){
+conn.on('open',()=>{
+document.getElementById('status').textContent=`Online szoba: ${roomCode} · Kapcsolódva! Te vagy: ${myRole=='A'?'A játékos':'B játékos'}`;
+if(myRole==='A')push();
+});
+conn.on('data',d=>{
+if(d.type==='STATE'){const wasOver=G&&G.over;G=d.payload;sel=null;document.getElementById('pick').innerHTML='';draw();if(G.over&&!wasOver)sndChk();}
+});
+conn.on('close',()=>{document.getElementById('status').textContent='A kapcsolat megszakadt.';});
+}
+document.getElementById('ngL').onclick=startLocal;
+document.getElementById('ngO').onclick=()=>{if(myRole==='A'){G=baseState(G.clockMin);G.mode='online';push();draw()}};
+document.getElementById('mkRoom').onclick=createRoom;
+document.getElementById('jnRoom').onclick=joinRoom;
+document.getElementById('copyLink').onclick=()=>{navigator.clipboard.writeText(location.href).then(()=>document.getElementById('status').textContent='Link másolva! Küldd el az ismerősödnek.')};
+document.getElementById('tabL').onclick=()=>{document.getElementById('tabL').classList.add('on');document.getElementById('tabO').classList.remove('on');document.getElementById('localCtl').style.display='flex';document.getElementById('onlineCtl').style.display='none';startLocal()};
+document.getElementById('tabO').onclick=()=>{document.getElementById('tabO').classList.add('on');document.getElementById('tabL').classList.remove('on');document.getElementById('localCtl').style.display='none';document.getElementById('onlineCtl').style.display='block'};
+const rp=new URLSearchParams(location.search).get('room');
+if(rp){document.getElementById('tabO').click();document.getElementById('code').value=rp;joinRoom()}
+draw();
+</script></body></html>
