@@ -31,6 +31,7 @@ button.act.sec{background:var(--card2);color:var(--fg);border:1px solid #ffffff3
 .s{outline:3px solid var(--acc);outline-offset:-3px}
 .t::after{content:"";position:absolute;width:28%;height:28%;border-radius:50%;background:rgba(0,0,0,.35)}
 .ck{background:radial-gradient(circle,#e0505580 30%,transparent 75%)!important}
+.lm{box-shadow:inset 0 0 0 3px #e6b93daa}
 .w{color:#fff;text-shadow:0 0 2px #000,0 0 2px #000,0 0 1px #000}.b{color:#111}
 .r{min-height:40px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12px;margin:4px 0;color:var(--muted)}
 .r button{font-size:22px;padding:1px 7px;border-radius:6px;border:1px solid #ffffff33;background:var(--card2);color:var(--fg);cursor:pointer}
@@ -49,7 +50,9 @@ button.act.sec{background:var(--card2);color:var(--fg);border:1px solid #ffffff3
 </div>
 <div id="status"></div>
 </div>
-<div id="clk"></div><div id="info"></div><div id="pick"></div><div id="bs"></div>
+<div id="clk"></div><div id="info"></div>
+<div style="text-align:center;margin-bottom:6px"><button class="act sec" id="undoBtn" style="display:none">↩ Lépés visszavonása (ebben a körben)</button></div>
+<div id="pick"></div><div id="bs"></div>
 <script>
 const U={K:'\u265A',Q:'\u265B',R:'\u265C',B:'\u265D',N:'\u265E',P:'\u265F\uFE0E'};
 const D=[[1,0],[-1,0],[0,1],[0,-1]],X=[[1,1],[1,-1],[-1,1],[-1,-1]],N=[[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]];
@@ -86,7 +89,7 @@ if(!n)for(const ty of new Set(G.R[own(bi,b.turn)][bi]))n+=drops(bi,ty).length;re
 function fresh(){const t='RNBQKBNR'.split(''),sq=[];for(let i=0;i<8;i++)sq[i]='b'+t[i];for(let i=8;i<16;i++)sq[i]='bP';for(let i=16;i<48;i++)sq[i]='';for(let i=48;i<56;i++)sq[i]='wP';for(let i=0;i<8;i++)sq[56+i]='w'+t[i];
 return{sq,turn:'w',ca:{wK:1,wQ:1,bK:1,bQ:1},ep:-1}}
 function baseState(mn){return{b:[fresh(),fresh()],R:{A:[[],[]],B:[[],[]]},Q:{A:[[],[]],B:[[],[]]},P:'A',need:[0],done:[],over:null,clockMin:mn,remain:mn?{A:mn*60000,B:mn*60000}:null,turnStart:Date.now(),mode:'local',hostId:null,guestId:null}}
-let G=baseState(10),sel=null,roomCode=null,myRole=null,peer=null,conn=null,pendingHost=false;
+let G=baseState(10),sel=null,roomCode=null,myRole=null,peer=null,conn=null,pendingHost=false,turnSnap=null,blinkT=null;
 /* --- audio --- */
 let actx;function beep(f,d,ty='sine',g=.18){try{actx=actx||new(window.AudioContext||webkitAudioContext)();const o=actx.createOscillator(),gn=actx.createGain();o.type=ty;o.frequency.value=f;gn.gain.value=g;gn.gain.exponentialRampToValueAtTime(.0001,actx.currentTime+d);o.connect(gn);gn.connect(actx.destination);o.start();o.stop(actx.currentTime+d)}catch(e){}}
 const sndMove=()=>beep(320,.09),sndCap=()=>{beep(180,.13,'triangle',.3);setTimeout(()=>beep(420,.1),40)},sndDrop=()=>beep(560,.11),sndChk=()=>{beep(700,.15,'sawtooth');setTimeout(()=>beep(900,.2),90)};
@@ -102,7 +105,7 @@ G.P=G.P=='A'?'B':'A';G.done=[];G.need=[0,1].filter(x=>own(x,G.b[x].turn)==G.P);c
 function go(bi,m){const b=G.b[bi],n=ap(b,m);
 if(n.cap&&n.cap[1]!='K'){G.Q[G.P][1-bi].push(n.cap[1]);sndCap()}else if(m.d)sndDrop();else sndMove();
 if(m.d)G.R[G.P][bi].splice(G.R[G.P][bi].indexOf(m.d),1);
-G.b[bi]=n;G.done.push(bi);sel=null;document.getElementById('pick').innerHTML='';
+n.last=m.d?{t:m.t}:{f:m.f,t:m.t};G.b[bi]=n;G.done.push(bi);sel=null;document.getElementById('pick').innerHTML='';
 endTurnIfDone();draw();push()}
 function clk(bi,i){if(G.over)return;const b=G.b[bi];
 if(sel&&sel.bi==bi){const m=sel.L.find(m=>m.t==i);if(m){if(m.pr){const p=document.getElementById('pick');p.innerHTML='Átváltozás: '+'QRBN'.split('').map(q=>`<button data-q="${q}">${U[q]}</button>`).join('');p.querySelectorAll('button').forEach(k=>k.onclick=()=>go(bi,{...m,q:k.dataset.q}));return}go(bi,m);return}}
@@ -110,11 +113,16 @@ sel=null;if(!ok(bi))return draw();const p=b.sq[i];
 if(p&&p[0]==b.turn)sel={bi,i,L:legal(b,i)};draw()}
 function dr(bi,ty){if(!ok(bi))return;sel={bi,d:ty,L:drops(bi,ty)};draw()}
 function draw(){const P=G.P,nm={A:'A játékos',B:'B játékos'};
+if(G.done.length===0)turnSnap=JSON.stringify(G);
 document.getElementById('info').innerHTML=G.over?`${G.over} `:`${nm[P]} jön – még lépned kell: ${G.need.filter(x=>!G.done.includes(x)).map(x=>(x+1)+'. tábla').join(' és ')}`;
+const canUndo=G.done.length>0&&!G.over&&(!roomCode||myRole===G.P);
+document.getElementById('undoBtn').style.display=canUndo?'inline-block':'none';
+const myTurn=roomCode&&myRole===G.P&&!G.over;
+if(myTurn&&document.hidden)blinkTitle(true);else blinkTitle(false);
 document.getElementById('bs').innerHTML=[0,1].map(bi=>{const b=G.b[bi],k=b.sq.indexOf(b.turn+'K'),isChk=att(b.sq,k,b.turn=='w'?'b':'w');
 const resRow=pl=>{const on_=pl==P&&ok(bi);return`<div class="r">${nm[pl]} bábui ide: `+(G.R[pl][bi].length||G.Q[pl][bi].length?G.R[pl][bi].map(ty=>`<button data-d="${ty}" ${on_?'':'disabled'} class="${sel&&sel.bi==bi&&sel.d==ty&&on_?'s':''}"><span class="${own(bi,'w')==pl?'w':'b'}">${U[ty]}</span></button>`).join('')+(G.Q[pl][bi].length?` <i style="opacity:.6">(köv. körtől: ${G.Q[pl][bi].map(t=>U[t]).join(' ')})</i>`:''):'–')+'</div>'};
-let sq='';for(let idx=0;idx<64;idx++){const i=bi==1?63-idx:idx;const p=b.sq[i],isT=sel&&sel.bi==bi&&sel.L.some(m=>m.t==i),isS=sel&&sel.bi==bi&&sel.i===i,isKchk=isChk&&i==k;
-sq+=`<div class="q ${((i>>3)+(i&7))%2?'d':'l'} ${isS?'s':''} ${isT?'t':''} ${isKchk?'ck':''}" data-i="${i}">${p?`<span class="${p[0]}">${U[p[1]]}</span>`:''}</div>`}
+let sq='';for(let idx=0;idx<64;idx++){const i=bi==1?63-idx:idx;const p=b.sq[i],isT=sel&&sel.bi==bi&&sel.L.some(m=>m.t==i),isS=sel&&sel.bi==bi&&sel.i===i,isKchk=isChk&&i==k,isLM=b.last&&(i===b.last.f||i===b.last.t);
+sq+=`<div class="q ${((i>>3)+(i&7))%2?'d':'l'} ${isS?'s':''} ${isT?'t':''} ${isKchk?'ck':''} ${isLM?'lm':''}" data-i="${i}">${p?`<span class="${p[0]}">${U[p[1]]}</span>`:''}</div>`}
 return`<div class="bd ${ok(bi)?'':'off'}" data-b="${bi}"><div class="h"><b>${bi+1}. tábla</b><span>A: ${bi==0?'fehér':'fekete'} · B: ${bi==0?'fekete':'fehér'}${isChk?' · ⚠ SAKK':''}</span></div>${resRow('B')}<div class="g">${sq}</div>${resRow('A')}</div>`}).join('');
 document.querySelectorAll('.q').forEach(e=>e.onclick=()=>clk(+e.closest('.bd').dataset.b,+e.dataset.i));
 document.querySelectorAll('.r button:not(:disabled)').forEach(e=>e.onclick=()=>dr(+e.closest('.bd').dataset.b,e.dataset.d));
@@ -126,6 +134,17 @@ function clockUI(){const c=document.getElementById('clk');if(!G.remain){c.textCo
 const a=remMs('A'),b=remMs('B');c.innerHTML=`⏱ A: <span class="${a<=20000?'warn':''}">${fmt(a)}</span> · B: <span class="${b<=20000?'warn':''}">${fmt(b)}</span>`}
 setInterval(()=>{if(!G||G.over||!G.remain)return;const t=remMs(G.P);if(t<=0){G.remain[G.P]=0;G.over=(G.P=='A'?'B':'A')+' játékos nyert (lejárt az idő)!';draw();push();return}clockUI();
 if(!roomCode)draw()},250);
+function blinkTitle(on){
+if(on&&!blinkT){let f=false;blinkT=setInterval(()=>{document.title=f?'Dupla sakk':'🔔 Te jössz! – Dupla sakk';f=!f},1000)}
+else if(!on&&blinkT){clearInterval(blinkT);blinkT=null;document.title='Dupla sakk'}
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)blinkTitle(false)});
+function undoHalf(){
+if(!turnSnap||G.done.length===0)return;
+if(roomCode&&myRole!==G.P)return;
+G=JSON.parse(turnSnap);sel=null;document.getElementById('pick').innerHTML='';draw();push();
+}
+document.getElementById('undoBtn').onclick=undoHalf;
 /* --- start / new game (PeerJS WebRTC, no account needed) --- */
 function push(){if(conn&&conn.open)conn.send({type:'STATE',payload:G})}
 function startLocal(){G=baseState(+document.getElementById('tm').value);roomCode=null;myRole=null;sel=null;if(conn){conn.close();conn=null}if(peer){peer.destroy();peer=null}draw()}
